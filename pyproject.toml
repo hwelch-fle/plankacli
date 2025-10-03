@@ -24,9 +24,9 @@ classifiers = [
 ]
 
 dependencies = [
-  "plankapy<2",
   "click",
-  "platformdirs"
+  "plankapy>=2.2.2",
+  "platformdirs",
 ]
 
 [project.optional-dependencies]
