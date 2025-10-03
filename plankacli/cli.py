@@ -1,3 +1,4 @@
+from typing import Any
 import click
 import random
 import plankapy
@@ -24,32 +25,37 @@ logger = get_logger()
 @click.option("--project", "-p", help="Name of project to work on")
 @click.option("--board", "-b", help="Name the board to work on")
 @click.pass_context
-def plankacli(ctx, verbose, quiet, url, token, config, project, board):
+def plankacli(ctx: click.Context, 
+              verbose: bool, 
+              quiet: bool, 
+              url: str, 
+              token: str, 
+              config: str, 
+              project: str, 
+              board: str):
     """A command-line interface to Planka"""
-
     log_level_from_cli(logger, verbose, quiet=quiet)
-
+    errors: list[str] = []
     if not url:
-        raise click.UsageError("No URL specified, and none in config")
+        errors.append("No URL specified, and none in config")
 
     if not token:
-        raise click.UsageError("No API token specified, and none in config")
+        errors.append("No API token specified, and none in config")
 
     if not project:
-        raise click.UsageError("No project name specified, and none in config")
+        errors.append("No project name specified, and none in config")
 
     if not board:
-        raise click.UsageError("No board name specified, and none in config")
+        errors.append("No board name specified, and none in config")
 
-    tokens = token.split(":", 1)
-    if len(tokens) == 2:
-        tokens = {"access_token": tokens[0], "http_only_token": tokens[1]}
-    else:
+    if errors:
+        raise click.UsageError('\n'.join(errors))
+    
+    token_dict: dict[str, str] = dict(zip(('access_token', 'http_only_token'), token.split(":", 1)))
+    if len(token_dict) != 2:
         logger.warning("No httpOnlyToken provided")
-        tokens = {"access_token": tokens[0], "http_only_token": None}
-
-    planka = plankapy.Planka(url=url, **tokens)
-
+        
+    planka = plankapy.Planka(url=url, auth=plankapy.TokenAuth(token_dict['access_token']))
     ctx.obj = {
         "planka": planka,
         "project_name": project,
@@ -60,11 +66,11 @@ def plankacli(ctx, verbose, quiet, url, token, config, project, board):
 
 @plankacli.group()
 @merge_config
-def list():
+def list_cmd():
     """Commands to manipulate lists"""
 
 
-@list.command()
+@list_cmd.command()
 @merge_config
 @click.option(
     "--tag", "-t", multiple=True, help="Only clear cards with this tag"
@@ -76,7 +82,7 @@ def list():
 @click.pass_obj
 def clear(obj, tag, list):
     """Clear ALL cards from the specified lists"""
-    boardselector = {
+    boardselector: dict[str, str] = {
         "project_name": obj["project_name"],
         "board_name": obj["board_name"],
     }
@@ -91,7 +97,7 @@ def clear(obj, tag, list):
     for lst in list:
         n = 0
         for n, card in enumerate(
-            cardctrl.get(**boardselector, list_name=lst), 1
+            cardctrl.get(**boardselector, listname=lst), 1
         ):
             oid = card["item"]["id"]
             if labels:
@@ -202,7 +208,7 @@ def add(obj, listname, position, due_date, tag, member, description, name):
         "board_name": obj["board_name"],
     }
     listselector = boardselector | {
-        "list_name": listname,
+        "listname": listname,
     }
 
     labelctrl = plankapy.Label(obj["planka"])
